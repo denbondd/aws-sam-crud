@@ -1,0 +1,101 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+
+Parameters:
+  Stage:
+    Type: String
+    Description: Stage name for Api Gateway
+    AllowedValues:
+      - dev
+      - prod
+
+Globals:
+  Function:
+    Runtime: java11
+    Timeout: 20
+    MemorySize: 512
+    AutoPublishAlias: !Ref Stage
+    Environment:
+      Variables:
+        TABLE: !Ref productsTable
+    Tracing: Active
+
+Resources:
+  myApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: !Ref Stage
+      Variables:
+        LAMBDA_ALIAS: !Ref Stage
+      TracingEnabled: true
+  productsTable:
+    Type: AWS::Serverless::SimpleTable
+    Properties:
+      PrimaryKey:
+        Name: productId
+        Type: String
+      SSESpecification:
+        SSEEnabled: true
+  getFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: org.example.handler.GetHandler::handleRequest
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref productsTable
+      Events:
+        ApiEvent:
+          Type: Api
+          Properties:
+            Method: get
+            Path: /products/{id}
+            RestApiId: !Ref myApi
+  postFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: org.example.handler.PostHandler::handleRequest
+      Policies:
+        - DynamoDBWritePolicy:
+            TableName: !Ref productsTable
+      Events:
+        ApiEvent:
+          Type: Api
+          Properties:
+            Method: post
+            Path: /products
+            RestApiId:
+              Ref: myApi
+  putFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: org.example.handler.PutHandler::handleRequest
+      Policies:
+        - DynamoDBWritePolicy:
+            TableName: !Ref productsTable
+      Events:
+        ApiEvent:
+          Type: Api
+          Properties:
+            Method: put
+            Path: /products
+            RestApiId:
+              Ref: myApi
+  deleteFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: org.example.handler.PutHandler::handleRequest
+      Policies:
+        - DynamoDBWritePolicy:
+            TableName: !Ref productsTable
+      Events:
+        ApiEvent:
+          Type: Api
+          Properties:
+            Method: delete
+            Path: /products/{id}
+            RestApiId:
+              Ref: myApi
+
+Outputs:
+  Endpoint:
+    Value: !Sub "https://${myApi}.execute-api.${AWS::Region}.amazonaws.com/${Stage}/products"
